@@ -28,3 +28,11 @@
 而具體的技術細節，則是先瞄過，略懂就好，當然如果要詳讀我也會很開心XD
 
 總之，希望這份文件能幫上大家，謝謝。
+
+## AI聊天記錄
+
+2025-09-25 
+claude
+https://claude.ai/share/2ba515ab-9477-47b6-b36e-c9a4b4319592
+GPT
+https://chatgpt.com/share/68d53a83-0e0c-8002-b58b-1f81afa5fef5
