@@ -1,0 +1,30 @@
+datapath
+
+"C:\Users\4080\Desktop\python\Alz\Face\_analysis\asymmetry\data\features\datung\DeepLearning\5_vector_to_feature_V2\datung"
+
+data tree
+
+datung
+├── health
+│   ├── ACS
+│   │   ├── ACS1-1
+│   │   │   ├── acs001_color_image11_LR_difference.json
+│   │   │   ├── acs001_color_image14_LR_difference.json
+│   │   │   ├── acs001_color_image16_LR_difference.json
+│   │   │   ├── acs001_color_image17_LR_difference.json
+│   │   │   ├── acs001_color_image24_LR_difference.json
+│   │   │   ├── acs001_color_image26_LR_difference.json
+.......
+│   └── NAD
+│       ├── NAD1-1
+│       │   ├── nad001_color_image12_LR_difference.json
+│       │   ├── nad001_color_image13_LR_difference.json
+│       │   ├── nad001_color_image14_LR_difference.json
+│       │   ├── nad001_color_image15_LR_difference.json
+.......
+└── patient
+    ├── P1-2
+    │   ├── p1-2_color_image11_LR_difference.json
+    │   ├── p1-2_color_image13_LR_difference.json
+    │   ├── p1-2_color_image14_LR_difference.json
+.......
