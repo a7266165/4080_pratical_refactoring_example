@@ -1,0 +1,45 @@
+[project]
+name = "alz-face"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "a7266165",email = "M123020018@student.nsysu.edu.tw"}
+]
+license = {text = "MIT"}
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+    "deepface (>=0.0.95,<0.0.96)",
+    "opencv-python-headless (>=4.12.0.88,<5.0.0.0)",
+    "tqdm (>=4.67.1,<5.0.0)",
+    "pandas (>=2.3.2,<3.0.0)",
+    "pyarrow (>=21.0.0,<22.0.0)",
+    "insightface (>=0.7.3,<0.8.0)",
+    "dlib (>=20.0.0,<21.0.0)",
+    "keras-vggface (>=0.6,<0.7)",
+    "tensorflow (>=2.20.0,<3.0.0)",
+    "onnxruntime-gpu (>=1.22.0,<2.0.0)",
+    "face-recognition (>=1.3.0,<2.0.0)",
+    "tf-keras (>=2.20.1,<3.0.0)",
+    "ultralytics (>=8.3.196,<9.0.0)",
+    "torch (>=2.7.1,<3.0.0)",
+    "torchvision (>=0.22.1,<0.23.0)",
+    "torchaudio (>=2.7.1,<3.0.0)",
+    "xgboost (>=3.0.5,<4.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[[tool.poetry.source]]
+name = "pytorch-cu118"
+url = "https://download.pytorch.org/whl/cu118"
+priority = "explicit"
+
+
+[tool.poetry.dependencies]
+torch = {source = "pytorch-cu118"}
+torchvision = {source = "pytorch-cu118"}
+torchaudio = {source = "pytorch-cu118"}

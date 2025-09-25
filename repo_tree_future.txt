@@ -1,0 +1,71 @@
+face_asymmetry_analysis/
+├── config/
+│   ├── __init__.py
+│   ├── base_config.py           # 基礎配置類
+│   ├── preprocessing.yaml       # 前處理參數
+│   ├── features.yaml            # 特徵提取參數
+│   └── training.yaml            # 訓練參數
+├── src/
+│   ├── __init__.py
+│   ├── preprocessing/
+│   │   ├── __init__.py
+│   │   ├── face_selection.py    # 步驟0: 臉部篩選
+│   │   ├── face_alignment.py    # 步驟1: 角度校正
+│   │   ├── face_mirroring.py    # 步驟2: 鏡射處理
+│   │   └── histogram_matching.py # 步驟3: 直方圖校正
+│   ├── features/
+│   │   ├── __init__.py
+│   │   ├── extractors/
+│   │   │   ├── __init__.py
+│   │   │   ├── base.py          # 抽象基類
+│   │   │   ├── vggface.py       # VGG-Face 提取器
+│   │   │   ├── arcface.py       # ArcFace 提取器
+│   │   │   ├── dlib.py          # Dlib 提取器
+│   │   │   ├── deepid.py        # DeepID 提取器
+│   │   │   └── topofr.py        # TopoFR 提取器
+│   │   ├── feature_extraction.py # 特徵提取管線
+│   │   └── feature_difference.py # 特徵差異計算
+│   ├── models/
+│   │   ├── __init__.py
+│   │   ├── classifiers.py       # 分類器工廠
+│   │   ├── cross_validation.py  # 交叉驗證策略
+│   │   ├── training.py          # 訓練流程
+│   │   └── evaluation.py        # 評估指標
+│   ├── data/
+│   │   ├── __init__.py
+│   │   ├── loader.py            # 資料載入器
+│   │   ├── demographics.py      # 人口統計處理
+│   │   └── balancing.py         # 資料平衡策略
+│   └── utils/
+│       ├── __init__.py
+│       ├── io_utils.py          # 檔案I/O工具
+│       ├── image_utils.py       # 影像處理工具
+│       └── logging_utils.py     # 日誌工具
+├── scripts/
+│   ├── run_preprocessing.py     # 執行前處理
+│   ├── run_feature_extraction.py # 執行特徵提取
+│   ├── run_training.py          # 執行訓練
+│   └── run_full_pipeline.py     # 執行完整流程
+├── tests/
+│   ├── __init__.py
+│   ├── test_preprocessing/
+│   ├── test_features/
+│   └── test_models/
+├── docs/
+│   ├── architecture.md          # 架構說明
+│   ├── usage.md                 # 使用指南
+│   └── api.md                   # API文件
+├── legacy/                       # 舊版程式碼（暫存）
+│   ├── 0_以三條中軸篩選相片.py
+│   ├── 1_以中軸角度校正圖片.py
+│   ├── 2_new_鏡射相片.py
+│   ├── 3_new_直方圖校正.py
+│   ├── 4_new_pics_to_vectors.py
+│   ├── 5_new_calculating_new_vectors_diff.py
+│   └── 6_new_train_model.py
+├── .gitignore
+├── README.md
+├── poetry.lock
+├── pyproject.toml
+├── repo_tree.txt                # 現有結構
+└── repo_tree_future.txt         # 目標結構
