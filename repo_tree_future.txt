@@ -49,8 +49,7 @@ face_asymmetry_analysis/
 │   └── run_full_pipeline.py     # 執行完整流程
 ├── tests/
 │   ├── test_data_loading.py
-│   ├── test_models.py
-│   └── test_selection.py
+│   └── test_pipeline.py
 ├── legacy/                       # 舊版程式碼（暫存）
 │   ├── 0_以三條中軸篩選相片.py
 │   ├── 1_以中軸角度校正圖片.py
