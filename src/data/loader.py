@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import List, Dict, Optional, Tuple
 import numpy as np
 from .structures import SubjectInfo, SubjectFeature, DatasetInfo
+from src.utils.id_parser import parse_subject_id
 
 class FeatureDataLoader:
     """特徵資料載入器"""
@@ -60,13 +61,12 @@ class FeatureDataLoader:
         subject_folders = [f for f in path.iterdir() if f.is_dir()]
         
         # 先依 subject（個案）彙整各次訪視的檔案
-        # key: id(int)；val: List[ {visit:int, folder:Path, files:List[Path]} ]
         subject_dict: Dict[int, List[Dict]] = {}
         for folder in subject_folders:
             subj_id_num, visit_num = self._parse_folder_name(folder.name, fallback_group=group)
             json_files = self._collect_subject_jsons(folder)
             if not json_files:
-                continue  # 沒資料就略過
+                continue
             
             subject_dict.setdefault(subj_id_num, []).append({
                 "visit": visit_num,
@@ -91,22 +91,19 @@ class FeatureDataLoader:
     def _parse_folder_name(self, folder_name: str, fallback_group: str) -> Tuple[int, int]:
         """解析資料夾名稱取得 (subject_id_number, visit_number)
         
-        支援多種常見命名：
-        - 'ACS12-3' / 'NAD7-1' / 'P15-2'（前綴字母+個案號-訪視）
-        - '12-3'（只有數字）
-        - 'ACS-12-3'（分段以 -）
-        
-        若多個數字存在，前者視為個案號、後者視為訪視次數。
-        若訪視次數缺省則視為 1。
+        使用統一的ID解析工具
         """
-        # 取出所有連續數字
-        nums = re.findall(r"\d+", folder_name)
-        if not nums:
-            # 沒抓到數字就視為未知，回傳 (0, 1)
-            return 0, 1
-        if len(nums) == 1:
-            return int(nums[0]), 1
-        return int(nums[0]), int(nums[1])
+        base_id, visit_number = parse_subject_id(folder_name)
+        
+        # 提取數字部分作為subject_id_number
+        # 例如 "ACS12" -> 12, "P1" -> 1
+        numbers = re.findall(r'\d+', base_id)
+        if numbers:
+            subject_id_number = int(numbers[0])
+        else:
+            subject_id_number = 0
+            
+        return subject_id_number, visit_number
     
     def _collect_subject_jsons(self, folder: Path) -> List[Path]:
         """收集該訪視資料夾中的 JSON 特徵檔
