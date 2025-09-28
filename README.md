@@ -36,3 +36,9 @@ claude
 https://claude.ai/share/2ba515ab-9477-47b6-b36e-c9a4b4319592
 GPT
 https://chatgpt.com/share/68d53a83-0e0c-8002-b58b-1f81afa5fef5
+
+2025-09-26 ~ 2025-09-28
+claude
+https://claude.ai/share/c28f3d05-9623-4913-a984-950af8a80091
+GPT
+https://chatgpt.com/share/68d8b07d-87fc-8002-97a0-2b62572727e9
