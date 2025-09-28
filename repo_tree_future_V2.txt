@@ -37,6 +37,10 @@ face_asymmetry_analysis/
 ├── scripts/
 │   ├── main.py
 ├── tests/
+├── legacy_V2/  		     # 詳細請參考repo_tree_future
+│   ├── scripts
+│   ├── src
+│   └── tests
 ├── legacy/                       # 舊版程式碼（暫存）
 │   ├── 0_以三條中軸篩選相片.py
 │   ├── 1_以中軸角度校正圖片.py
