@@ -8,12 +8,12 @@ import numpy as np
 from datetime import datetime
 import logging
 
-from src.data.loader import FeatureDataLoader
-from src.data.demographics import DemographicsProcessor
-from src.data.balancing import DataBalancer, BalancingConfig
-from src.models.classifiers import ClassifierFactory, ClassifierConfig, ClassifierType
-from src.train.cross_validation import CrossValidator, CVConfig, CVMethod
-from src.features.selection import FeatureSelector, SelectionConfig, SelectionMethod
+from legacy_V2.src.data.loader import FeatureDataLoader
+from legacy_V2.src.data.demographics import DemographicsProcessor
+from legacy_V2.src.data.balancing import DataBalancer, BalancingConfig
+from legacy_V2.src.models.classifiers import ClassifierFactory, ClassifierConfig, ClassifierType
+from legacy_V2.src.train.cross_validation import CrossValidator, CVConfig, CVMethod
+from legacy_V2.src.features.selection import FeatureSelector, SelectionConfig, SelectionMethod
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

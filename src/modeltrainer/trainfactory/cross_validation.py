@@ -1,118 +1,59 @@
-# src/models/cross_validation.py
+# src/modeltrainer/trainfactory/cross_validation.py
 """交叉驗證策略模組"""
-from enum import Enum
-from typing import Dict, List, Tuple, Optional, Any
-from dataclasses import dataclass
+from typing import Dict, List, Tuple, Optional
 import numpy as np
 from sklearn.model_selection import StratifiedKFold
 from sklearn.metrics import confusion_matrix, accuracy_score, matthews_corrcoef
-
-from legacy_V2.src.models.classifiers import ClassifierFactory, ClassifierConfig, ClassifierType
-from legacy_V2.src.features.selection import FeatureSelector, SelectionConfig
+from .classifier_factory import ClassifierFactory
+from .feature_selection import FeatureSelector
 import logging
 
 logger = logging.getLogger(__name__)
 
-
-class CVMethod(Enum):
-    """交叉驗證方法"""
-    LOSO = "LOSO"  # Leave-One-Subject-Out
-    KFOLD = "K-Fold"
-
-
-@dataclass
-class CVConfig:
-    """交叉驗證配置"""
-    method: CVMethod = CVMethod.LOSO
-    n_folds: int = 5  # 僅用於 K-Fold
-    random_state: int = 42
-    feature_selection: Optional[SelectionConfig] = None
-
-
-@dataclass
-class CVResults:
-    """交叉驗證結果"""
-    confusion_matrix: np.ndarray
-    accuracy: float
-    mcc: float
-    sensitivity: float
-    specificity: float
-    y_true: np.ndarray
-    y_pred: np.ndarray
-    test_subjects: Optional[List[str]] = None
-    
-    def to_dict(self) -> Dict[str, Any]:
-        """轉換為字典格式"""
-        return {
-            'confusion_matrix': self.confusion_matrix.tolist(),
-            'accuracy': float(self.accuracy),
-            'mcc': float(self.mcc),
-            'sensitivity': float(self.sensitivity),
-            'specificity': float(self.specificity)
-        }
-    
-    def print_summary(self):
-        """印出結果摘要"""
-        cm = self.confusion_matrix
-        print(f"    準確率: {self.accuracy:.4f}")
-        print(f"    MCC: {self.mcc:.4f}")
-        print(f"    靈敏度: {self.sensitivity:.4f}")
-        print(f"    特異度: {self.specificity:.4f}")
-        print(f"    混淆矩陣:")
-        print(f"      TN={cm[0,0]}, FP={cm[0,1]}")
-        print(f"      FN={cm[1,0]}, TP={cm[1,1]}")
-
-
 class CrossValidator:
-    """交叉驗證器
+    """交叉驗證器"""
     
-    統一的交叉驗證介面，支援：
-    - Leave-One-Subject-Out (LOSO)
-    - K-Fold 交叉驗證
-    - 整合特徵選擇
-    - 自動處理受試者層級的劃分
-    """
-    
-    def __init__(self, config: Optional[CVConfig] = None):
-        """
-        Args:
-            config: 交叉驗證配置
-        """
-        self.config = config or CVConfig()
-        self.classifier_factory = ClassifierFactory()
+    def __init__(
+        self,
+        cv_method: str = "5-Fold",
+        n_folds: int = 5,
+        random_state: int = 42
+    ):
+        self.cv_method = cv_method
+        self.n_folds = n_folds
+        self.random_state = random_state
         
     def validate(
         self,
         X: np.ndarray,
         y: np.ndarray,
         subject_ids: List[str],
-        classifier_config: ClassifierConfig
-    ) -> CVResults:
-        """執行交叉驗證
+        classifier_name: str,
+        use_feature_selection: bool = False,
+        feature_selection_method: str = "correlation"
+    ) -> Dict:
+        """執行交叉驗證"""
         
-        Args:
-            X: 特徵矩陣
-            y: 標籤
-            subject_ids: 受試者ID列表
-            classifier_config: 分類器配置
-            
-        Returns:
-            交叉驗證結果
-        """
-        if self.config.method == CVMethod.LOSO:
-            return self._loso_cv(X, y, subject_ids, classifier_config)
-        elif self.config.method == CVMethod.KFOLD:
-            return self._kfold_cv(X, y, subject_ids, classifier_config)
+        if "LOSO" in self.cv_method.upper():
+            return self._loso_cv(
+                X, y, subject_ids, classifier_name,
+                use_feature_selection, feature_selection_method
+            )
         else:
-            raise ValueError(f"不支援的CV方法: {self.config.method}")
+            return self._kfold_cv(
+                X, y, subject_ids, classifier_name,
+                use_feature_selection, feature_selection_method
+            )
     
     def _loso_cv(
         self,
         X: np.ndarray,
         y: np.ndarray,
         subject_ids: List[str],
-        classifier_config: ClassifierConfig
-    ) -> CVResults:
+        classifier_name: str,
+        use_feature_selection: bool,
+        feature_selection_method: str
+    ) -> Dict:
         """Leave-One-Subject-Out 交叉驗證"""
         unique_subjects = list(set(subject_ids))
         n_subjects = len(unique_subjects)
@@ -121,7 +62,6 @@ class CrossValidator:
         
         all_y_true = []
         all_y_pred = []
-        all_test_subjects = []
         
         for i, test_subject in enumerate(unique_subjects):
             # 建立訓練和測試索引
@@ -136,18 +76,20 @@ class CrossValidator:
             y_train = y[train_indices]
             y_test = y[test_indices]
             
-            # 特徵選擇（如果配置了）
-            if self.config.feature_selection:
-                selector = FeatureSelector(self.config.feature_selection)
-                X_train, X_test, _ = selector.select_features(X_train, y_train, X_test)
+            # 特徵選擇
+            if use_feature_selection:
+                X_train, X_test = self._apply_feature_selection(
+                    X_train, y_train, X_test,
+                    classifier_name, feature_selection_method
+                )
             
             # 資料預處理
-            X_train, X_test, _ = self.classifier_factory.prepare_data(
-                X_train, X_test, classifier_config
+            X_train, X_test, _ = ClassifierFactory.prepare_data(
+                X_train, X_test, classifier_name
             )
             
             # 訓練分類器
-            classifier = self.classifier_factory.create_classifier(classifier_config)
+            classifier = ClassifierFactory.create_classifier(classifier_name)
             classifier.fit(X_train, y_train)
             
             # 預測
@@ -163,15 +105,13 @@ class CrossValidator:
             
             all_y_true.append(y_true_final)
             all_y_pred.append(y_pred_final)
-            all_test_subjects.append(test_subject)
             
             if (i + 1) % 20 == 0:
                 logger.debug(f"  進度: {i + 1}/{n_subjects}")
         
         return self._calculate_metrics(
             np.array(all_y_true),
-            np.array(all_y_pred),
-            all_test_subjects
+            np.array(all_y_pred)
         )
     
     def _kfold_cv(
@@ -179,10 +119,12 @@ class CrossValidator:
         X: np.ndarray,
         y: np.ndarray,
         subject_ids: List[str],
-        classifier_config: ClassifierConfig
-    ) -> CVResults:
+        classifier_name: str,
+        use_feature_selection: bool,
+        feature_selection_method: str
+    ) -> Dict:
         """K-Fold 交叉驗證（考慮受試者分組）"""
-        logger.info(f"執行 {self.config.n_folds}-fold 交叉驗證")
+        logger.info(f"執行 {self.n_folds}-fold 交叉驗證")
         
         # 建立受試者到索引的映射
         unique_subjects = list(set(subject_ids))
@@ -202,16 +144,16 @@ class CrossValidator:
         
         # 使用StratifiedKFold對受試者進行分組
         skf = StratifiedKFold(
-            n_splits=self.config.n_folds,
+            n_splits=self.n_folds,
             shuffle=True,
-            random_state=self.config.random_state
+            random_state=self.random_state
         )
         
         all_y_true = []
         all_y_pred = []
         
         for fold_idx, (train_subject_idx, test_subject_idx) in enumerate(skf.split(unique_subjects, subject_labels)):
-            logger.debug(f"  Fold {fold_idx + 1}/{self.config.n_folds}")
+            logger.debug(f"  Fold {fold_idx + 1}/{self.n_folds}")
             
             # 獲取訓練和測試受試者
             train_subjects = [unique_subjects[i] for i in train_subject_idx]
@@ -231,17 +173,19 @@ class CrossValidator:
             y_test = y[test_indices]
             
             # 特徵選擇
-            if self.config.feature_selection:
-                selector = FeatureSelector(self.config.feature_selection)
-                X_train, X_test, _ = selector.select_features(X_train, y_train, X_test)
+            if use_feature_selection:
+                X_train, X_test = self._apply_feature_selection(
+                    X_train, y_train, X_test,
+                    classifier_name, feature_selection_method
+                )
             
             # 資料預處理
-            X_train, X_test, _ = self.classifier_factory.prepare_data(
-                X_train, X_test, classifier_config
+            X_train, X_test, _ = ClassifierFactory.prepare_data(
+                X_train, X_test, classifier_name
             )
             
             # 訓練分類器
-            classifier = self.classifier_factory.create_classifier(classifier_config)
+            classifier = ClassifierFactory.create_classifier(classifier_name)
             classifier.fit(X_train, y_train)
             
             # 預測（對每個測試受試者進行預測）
@@ -268,12 +212,31 @@ class CrossValidator:
             np.array(all_y_pred)
         )
     
+    def _apply_feature_selection(
+        self,
+        X_train: np.ndarray,
+        y_train: np.ndarray,
+        X_test: np.ndarray,
+        classifier_name: str,
+        method: str
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """應用特徵選擇"""
+        if classifier_name in ["SVM", "Logistic Regression"] or method == "correlation":
+            X_train, X_test, _ = FeatureSelector.select_by_correlation(
+                X_train, X_test, threshold=0.95
+            )
+        elif classifier_name == "XGBoost" or method == "xgb_importance":
+            X_train, X_test, _ = FeatureSelector.select_by_xgb_importance(
+                X_train, y_train, X_test, importance_ratio=0.8
+            )
+        
+        return X_train, X_test
+    
     def _calculate_metrics(
         self,
         y_true: np.ndarray,
-        y_pred: np.ndarray,
-        test_subjects: Optional[List[str]] = None
-    ) -> CVResults:
+        y_pred: np.ndarray
+    ) -> Dict:
         """計算評估指標"""
         cm = confusion_matrix(y_true, y_pred)
         
@@ -286,13 +249,10 @@ class CrossValidator:
         sensitivity = tp / (tp + fn) if (tp + fn) > 0 else 0
         specificity = tn / (tn + fp) if (tn + fp) > 0 else 0
         
-        return CVResults(
-            confusion_matrix=cm,
-            accuracy=acc,
-            mcc=mcc,
-            sensitivity=sensitivity,
-            specificity=specificity,
-            y_true=y_true,
-            y_pred=y_pred,
-            test_subjects=test_subjects
-        )
+        return {
+            'accuracy': acc,
+            'mcc': mcc,
+            'sensitivity': sensitivity,
+            'specificity': specificity,
+            'confusion_matrix': cm
+        }

@@ -1,82 +1,52 @@
-# src/data/balancing.py
-"""資料平衡策略模組"""
-from typing import Dict, Set, Tuple, Optional, List
-from dataclasses import dataclass
+# src/featureloader/selector/age_balancing.py
+"""年齡平衡策略"""
+from typing import Dict, Set, Tuple, Optional
 import pandas as pd
 import numpy as np
-from legacy_V2.src.data.demographics import DemographicsProcessor
 import logging
 
 logger = logging.getLogger(__name__)
 
-
-@dataclass
-class BalancingConfig:
-    """資料平衡配置"""
-    enable_age_matching: bool = True
-    enable_cdr_filter: bool = False
-    cdr_threshold: float = 0.5
-    n_bins: int = 5
-    random_state: int = 42
-    method: str = "quantile"  # "quantile" or "equal_width"
-
-
 class DataBalancer:
-    """資料平衡器
-    
-    負責：
-    - 年齡配對
-    - CDR篩選
-    - 組別平衡
-    """
+    """資料平衡器"""
     
     def __init__(
         self,
-        demographics_processor: DemographicsProcessor,
-        config: Optional[BalancingConfig] = None
+        demographics_processor,
+        enable_age_matching: bool = True,
+        enable_cdr_filter: bool = False,
+        cdr_threshold: float = 0.5,
+        n_bins: int = 5,
+        random_state: int = 42
     ):
         self.demo_processor = demographics_processor
-        self.config = config or BalancingConfig()
-        self.rng = np.random.RandomState(self.config.random_state)
+        self.enable_age_matching = enable_age_matching
+        self.enable_cdr_filter = enable_cdr_filter
+        self.cdr_threshold = cdr_threshold
+        self.n_bins = n_bins
+        self.rng = np.random.RandomState(random_state)
         
-    def balance_groups(
-        self,
-        groups: Optional[List[str]] = None
-    ) -> Tuple[Dict[str, Set[str]], pd.DataFrame]:
-        """執行組別平衡
-        
-        Args:
-            groups: 要平衡的組別，預設為 ["ACS", "NAD"] vs ["P"]
-            
-        Returns:
-            - allowed_ids: 各組允許使用的ID集合
-            - summary: 統計摘要
-        """
-        if groups is None:
-            groups = ["ACS", "NAD", "P"]
-        
+    def balance_groups(self) -> Tuple[Dict[str, Set[str]], pd.DataFrame]:
+        """執行組別平衡"""
         tables = self.demo_processor.tables
         
         # CDR篩選
-        if self.config.enable_cdr_filter and self.config.cdr_threshold is not None:
-            tables["P"] = self.demo_processor.filter_by_cdr(
-                self.config.cdr_threshold, "P"
-            )
-            
-            if len(tables["P"]) == 0:
-                logger.warning(f"CDR篩選後P組無資料")
-                return {"ACS": set(), "NAD": set(), "P": set()}, pd.DataFrame()
+        if self.enable_cdr_filter and self.cdr_threshold is not None:
+            p_df = tables["P"]
+            if "Global_CDR" in p_df.columns:
+                tables["P"] = p_df[p_df["Global_CDR"] > self.cdr_threshold].copy()
+                
+                if len(tables["P"]) == 0:
+                    logger.warning(f"CDR篩選後P組無資料")
+                    return {"ACS": set(), "NAD": set(), "P": set()}, pd.DataFrame()
         
         # 年齡配對
-        if self.config.enable_age_matching:
+        if self.enable_age_matching:
             return self._age_balance(tables)
         else:
             return self._no_balance(tables)
     
-    def _age_balance(
-        self,
-        tables: Dict[str, pd.DataFrame]
-    ) -> Tuple[Dict[str, Set[str]], pd.DataFrame]:
+    def _age_balance(self, tables: Dict[str, pd.DataFrame]) -> Tuple[Dict[str, Set[str]], pd.DataFrame]:
         """執行年齡配對"""
         logger.info("執行年齡配對...")
         
@@ -97,25 +67,18 @@ class DataBalancer:
         all_df = pd.concat([health_df, p_df], ignore_index=True)
         
         # 建立年齡分箱
-        if self.config.method == "quantile":
-            try:
-                all_df["age_bin"] = pd.qcut(
-                    all_df["Age"],
-                    q=self.config.n_bins,
-                    duplicates="drop"
-                )
-            except ValueError:
-                # 如果分箱失敗，減少箱數
-                n_bins_eff = min(self.config.n_bins, all_df["Age"].nunique())
-                all_df["age_bin"] = pd.qcut(
-                    all_df["Age"],
-                    q=n_bins_eff,
-                    duplicates="drop"
-                )
-        else:  # equal_width
-            all_df["age_bin"] = pd.cut(
+        try:
+            all_df["age_bin"] = pd.qcut(
                 all_df["Age"],
-                bins=self.config.n_bins
+                q=self.n_bins,
+                duplicates="drop"
+            )
+        except ValueError:
+            n_bins_eff = min(self.n_bins, all_df["Age"].nunique())
+            all_df["age_bin"] = pd.qcut(
+                all_df["Age"],
+                q=n_bins_eff,
+                duplicates="drop"
             )
         
         # 在每個箱中平衡樣本
@@ -131,10 +94,8 @@ class DataBalancer:
             if n_health == 0 or n_p == 0:
                 continue
             
-            # 選擇較少的數量
             target = min(n_health, n_p)
             
-            # 隨機抽樣
             health_pool = bin_df[bin_df["group"] == "Health"]
             p_pool = bin_df[bin_df["group"] == "P"]
             
@@ -169,20 +130,14 @@ class DataBalancer:
         
         return allowed_ids, summary
     
-    def _no_balance(
-        self,
-        tables: Dict[str, pd.DataFrame]
-    ) -> Tuple[Dict[str, Set[str]], pd.DataFrame]:
-        """不進行平衡，返回所有ID"""
-        logger.info("跳過年齡配對，使用所有資料")
-        
+    def _no_balance(self, tables: Dict[str, pd.DataFrame]) -> Tuple[Dict[str, Set[str]], pd.DataFrame]:
+        """不進行平衡"""
         allowed_ids = {
             "ACS": set(tables["ACS"]["ID"].tolist()),
             "NAD": set(tables["NAD"]["ID"].tolist()),
             "P": set(tables["P"]["ID"].tolist())
         }
         
-        # 建立統計摘要
         all_dfs = []
         for group, df in tables.items():
             temp_df = df[["ID", "Age"]].copy()
@@ -194,15 +149,10 @@ class DataBalancer:
         
         return allowed_ids, summary
     
-    def _create_summary(
-        self,
-        all_df: pd.DataFrame,
-        allowed_ids: Dict[str, Set[str]]
-    ) -> pd.DataFrame:
+    def _create_summary(self, all_df: pd.DataFrame, allowed_ids: Dict[str, Set[str]]) -> pd.DataFrame:
         """建立統計摘要"""
         stats = []
         
-        # 健康組統計
         health_ids = allowed_ids["ACS"] | allowed_ids["NAD"]
         if health_ids:
             health_sub = all_df[all_df["ID"].isin(health_ids)]
@@ -215,7 +165,6 @@ class DataBalancer:
                 "age_max": health_sub["Age"].max()
             })
         
-        # 病患組統計
         if allowed_ids["P"]:
             p_sub = all_df[all_df["ID"].isin(allowed_ids["P"])]
             stats.append({
@@ -229,16 +178,13 @@ class DataBalancer:
         
         summary_df = pd.DataFrame(stats)
         
-        # 輸出統計資訊
-        cdr_str = f" (CDR>{self.config.cdr_threshold})" if self.config.enable_cdr_filter else ""
-        logger.info(f"\n資料平衡統計{cdr_str}:")
+        logger.info(f"\n資料平衡統計:")
         for _, row in summary_df.iterrows():
-            logger.info(f"  {row['group']}: n={row['n']}, "
+            logger.info(f"  {row['group']}: n={row['n']:.0f}, "
                        f"age={row['age_mean']:.1f}±{row['age_std']:.1f} "
                        f"({row['age_min']:.0f}-{row['age_max']:.0f})")
         
-        if "Health" in summary_df["group"].values:
-            logger.info(f"  Health組內: ACS={len(allowed_ids['ACS'])}, "
-                       f"NAD={len(allowed_ids['NAD'])}")
+        logger.info(f"  Health組內: ACS={len(allowed_ids['ACS'])}, "
+                   f"NAD={len(allowed_ids['NAD'])}")
         
         return summary_df

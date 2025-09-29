@@ -7,7 +7,7 @@ import numpy as np
 import re
 from dataclasses import dataclass
 import logging
-from src.utils.id_parser import parse_subject_id
+from legacy_V2.src.utils.id_parser import parse_subject_id
 
 logger = logging.getLogger(__name__)
 
