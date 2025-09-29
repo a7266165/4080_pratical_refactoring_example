@@ -5,8 +5,8 @@ import re
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple, Set
 import numpy as np
-from src.data_structure import SubjectInfo, SubjectFeature, DatasetInfo
-from src.utils.utils import parse_subject_id
+from src.data_structure import SubjectInfo, SubjectFeature
+from src.utils.utils import parse_subject_id, load_json
 import logging
 
 logger = logging.getLogger(__name__)
@@ -263,8 +263,7 @@ class FeatureLoader:
         vectors: List[np.ndarray] = []
 
         for json_file in json_files:
-            with open(json_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
+            data = load_json(json_file)
 
             # 根據特徵類型提取
             if feature_type == "difference":
