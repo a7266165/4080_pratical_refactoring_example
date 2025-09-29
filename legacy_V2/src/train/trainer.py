@@ -11,13 +11,13 @@ import json
 import numpy as np
 from datetime import datetime
 
-from src.data.loader import FeatureDataLoader
-from src.data.demographics import DemographicsProcessor
-from src.data.balancing import DataBalancer, BalancingConfig
-from src.features.selection import SelectionConfig
-from src.features.demographic_features import DemographicFeatureIntegrator, DemographicFeatureConfig
-from src.models.classifiers import ClassifierConfig
-from src.train.cross_validation import CrossValidator, CVConfig, CVMethod
+from legacy_V2.src.data.loader import FeatureDataLoader
+from legacy_V2.src.data.demographics import DemographicsProcessor
+from legacy_V2.src.data.balancing import DataBalancer, BalancingConfig
+from legacy_V2.src.features.selection import SelectionConfig
+from legacy_V2.src.features.demographic_features import DemographicFeatureIntegrator, DemographicFeatureConfig
+from legacy_V2.src.models.classifiers import ClassifierConfig
+from legacy_V2.src.train.cross_validation import CrossValidator, CVConfig, CVMethod
 import logging
 
 logger = logging.getLogger(__name__)

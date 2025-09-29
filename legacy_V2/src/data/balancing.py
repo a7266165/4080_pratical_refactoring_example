@@ -4,7 +4,7 @@ from typing import Dict, Set, Tuple, Optional, List
 from dataclasses import dataclass
 import pandas as pd
 import numpy as np
-from src.data.demographics import DemographicsProcessor
+from legacy_V2.src.data.demographics import DemographicsProcessor
 import logging
 
 logger = logging.getLogger(__name__)

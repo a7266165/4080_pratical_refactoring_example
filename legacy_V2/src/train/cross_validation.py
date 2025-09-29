@@ -7,8 +7,8 @@ import numpy as np
 from sklearn.model_selection import StratifiedKFold
 from sklearn.metrics import confusion_matrix, accuracy_score, matthews_corrcoef
 
-from src.models.classifiers import ClassifierFactory, ClassifierConfig, ClassifierType
-from src.features.selection import FeatureSelector, SelectionConfig
+from legacy_V2.src.models.classifiers import ClassifierFactory, ClassifierConfig, ClassifierType
+from legacy_V2.src.features.selection import FeatureSelector, SelectionConfig
 import logging
 
 logger = logging.getLogger(__name__)

@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import List, Dict, Optional, Tuple
 import numpy as np
 from .structures import SubjectInfo, SubjectFeature, DatasetInfo
-from src.utils.id_parser import parse_subject_id
+from legacy_V2.src.utils.id_parser import parse_subject_id
 
 class FeatureDataLoader:
     """特徵資料載入器"""
