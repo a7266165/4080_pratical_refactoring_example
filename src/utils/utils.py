@@ -6,7 +6,15 @@ from pathlib import Path
 from typing import Tuple, Dict, Any, Optional, List
 import numpy as np
 import pandas as pd
-from sklearn.metrics import matthews_corrcoef, confusion_matrix
+from sklearn.metrics import (
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    roc_auc_score,
+    matthews_corrcoef,
+    confusion_matrix,
+)
 
 
 # ========== ID 處理 ==========
@@ -55,18 +63,57 @@ def validate_data_consistency(
 
 
 # ========== 計算指標 ==========
-def calculate_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, float]:
-    """計算分類指標"""
+def calculate_metrics(
+    y_true: np.ndarray,
+    y_pred: np.ndarray,
+    y_prob: Optional[np.ndarray] = None,
+    include_auc: bool = True,
+) -> Dict[str, Any]:
+    """計算完整的分類指標
+
+    Args:
+        y_true: 真實標籤
+        y_pred: 預測標籤
+        y_prob: 預測機率 (用於計算AUC，可選)
+        include_auc: 是否計算AUC (需要y_prob)
+
+    Returns:
+        包含各種指標的字典：
+        - accuracy: 準確率
+        - precision: 精確率
+        - recall: 召回率 (敏感度)
+        - f1: F1分數
+        - mcc: Matthews相關係數
+        - sensitivity: 敏感度 (=recall)
+        - specificity: 特異度
+        - confusion_matrix: 混淆矩陣
+        - auc: ROC-AUC (如果提供y_prob)
+    """
+    # 基本指標
     cm = confusion_matrix(y_true, y_pred)
     tn, fp, fn, tp = cm.ravel()
 
-    return {
-        "accuracy": (tp + tn) / (tp + tn + fp + fn),
+    # 計算各項指標
+    metrics = {
+        "accuracy": accuracy_score(y_true, y_pred),
+        "precision": precision_score(y_true, y_pred, zero_division=0),
+        "recall": recall_score(y_true, y_pred, zero_division=0),
+        "f1": f1_score(y_true, y_pred, zero_division=0),
         "mcc": matthews_corrcoef(y_true, y_pred),
-        "sensitivity": tp / (tp + fn) if (tp + fn) > 0 else 0,
+        "sensitivity": tp / (tp + fn) if (tp + fn) > 0 else 0,  # = recall
         "specificity": tn / (tn + fp) if (tn + fp) > 0 else 0,
         "confusion_matrix": cm.tolist(),
     }
+
+    # 計算 AUC (如果有機率值)
+    if include_auc and y_prob is not None:
+        try:
+            metrics["auc"] = roc_auc_score(y_true, y_prob)
+        except Exception as e:
+            logging.warning(f"無法計算AUC: {e}")
+            metrics["auc"] = None
+
+    return metrics
 
 
 def calculate_dataset_stats(
