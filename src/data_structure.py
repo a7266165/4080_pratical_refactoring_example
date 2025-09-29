@@ -3,47 +3,39 @@
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Any
 import numpy as np
-
-
-@dataclass
-class Picture:
-    """圖片資料"""
-
-    path: str
-    image: Optional[np.ndarray] = None  # (H, W, 3) RGB array
-    subject_id: str = ""
-    group: str = ""  # ACS/NAD/P
-    visit: int = 1
-
+from pathlib import Path
 
 @dataclass
-class ExtractedFeatures:
-    """萃取的特徵（步驟0-5的輸出）"""
-
-    # 這其實就是現有的 *_LR_difference.json 內容
-    subject_id: str
-    group: str
-    visit: int
-    embedding_differences: Dict[str, np.ndarray]  # {model: features}
-    embedding_averages: Dict[str, np.ndarray]
-    relative_differences: Dict[str, np.ndarray]
-
-
-@dataclass
-class TrainingDataset:
-    """訓練資料集"""
-
-    X: np.ndarray  # (n_samples, n_features)
-    y: np.ndarray  # (n_samples,)
-    subject_ids: List[str]
-    metadata: Dict[str, Any]  # 包含使用的模型、特徵類型等資訊
-
+class SubjectInfo:
+    """個案資訊"""
+    group: str              # "ACS", "NAD", "P"
+    id: int                 # 1, 2, 3, ...
+    visit: int              # 1, 2, 3, ...
+    feature_paths: List[Path]
+    
+    @property
+    def label(self) -> int:
+        """模型訓練標籤"""
+        return 1 if self.group == "P" else 0
+    
+    @property
+    def subject_id(self) -> str:
+        """個案編號"""
+        return f"{self.group}{self.id}"
 
 @dataclass
-class ModelResults:
-    """模型訓練結果"""
+class SubjectFeature:
+    """特徵資料"""
+    subject_info: SubjectInfo
+    features: Dict[str, np.ndarray]  # {model_name: features}
+    feature_type: str  # 'difference', 'average', 'relative'
 
-    classifier: str
-    cv_method: str
-    metrics: Dict[str, float]  # accuracy, mcc, sensitivity, specificity
-    confusion_matrix: np.ndarray
+@dataclass
+class DatasetInfo:
+    """資料集統計資訊"""
+    n_samples: int
+    n_subjects: int
+    n_health: int
+    n_patient: int
+    groups: Dict[str, int]
+    feature_dim: int

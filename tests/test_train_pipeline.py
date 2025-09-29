@@ -1,14 +1,18 @@
-# tests/test_training_pipeline.py
+# tests/test_train_pipeline.py
 """測試訓練管線（步驟3-5）"""
 import sys
 from pathlib import Path
-
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import logging
 import traceback
 import numpy as np
+
+# 使用新的模組，不再依賴 legacy_V2
+from src.dataloader.dataloader import DataLoader
+from src.modeltrainer.modeltrainer import ModelTrainer
 from src.modeltrainer.trainfactory.classifiers import ClassifierType
+from src.reporter.reporter import Reporter
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s")
 log = logging.getLogger("test")
@@ -17,11 +21,10 @@ log = logging.getLogger("test")
 def test_feature_loader():
     """測試特徵載入器"""
     log.info("\n" + "=" * 60)
-    log.info("測試 FeatureLoader")
+    log.info("測試 DataLoader")
     log.info("=" * 60)
 
     try:
-        from src.featureloader.featureloader import FeatureLoader
 
         # 測試配置：先用最小集合測試
         EMBEDDING_MODELS = ["vggface"]  # 先測試一個
@@ -30,12 +33,12 @@ def test_feature_loader():
         AGE_MATCHING = False  # 先關閉，避免複雜度
         CDR_FILTER = False  # 先關閉
 
-        loader = FeatureLoader(
+        loader = DataLoader(
             EMBEDDING_MODELS, FEATURE_TYPES, USE_ALL_VISITS, AGE_MATCHING, CDR_FILTER
         )
 
-        # 載入特徵（features=None 表示從檔案載入）
-        dataset = loader.load(features=None)
+        # 載入特徵
+        dataset = loader.load()
 
         log.info(f"成功載入資料集")
         log.info(f"  Keys: {list(dataset.keys())}")
@@ -67,7 +70,6 @@ def test_model_trainer(dataset):
         return None
 
     try:
-        from src.modeltrainer.modeltrainer import ModelTrainer
 
         # 測試配置：用較快的配置
         CV_METHODS = ["5-Fold"]  # LOSO較慢，先用5-Fold
@@ -81,8 +83,8 @@ def test_model_trainer(dataset):
         # 為了加快測試，可以只用部分資料
         test_dataset = {}
         for key, data in dataset.items():
-            # 取前50筆資料做快速測試
-            n_samples = min(50, len(data["X"]))
+            # 取前10000筆資料做測試
+            n_samples = min(10000, len(data["X"]))
             test_dataset[key] = {
                 "X": data["X"][:n_samples],
                 "y": data["y"][:n_samples],
@@ -127,7 +129,6 @@ def test_reporter(results):
         return
 
     try:
-        from src.reporter.reporter import Reporter
 
         # 使用測試輸出目錄
         reporter = Reporter(output_dir="test_results")
@@ -182,10 +183,6 @@ def quick_test():
     log.info("\n執行快速完整測試...")
 
     try:
-        from src.featureloader.featureloader import FeatureLoader
-        from src.modeltrainer.modeltrainer import ModelTrainer
-        from src.reporter.reporter import Reporter
-
         # 實際要用的配置
         EMBEDDING_MODELS = ["vggface", "arcface"]  # 測試兩個模型
         FEATURE_TYPES = ["difference", "average"]  # 測試兩個特徵
@@ -210,9 +207,9 @@ def quick_test():
 
         # 執行管線
         log.info("\n步驟3: 載入特徵資料集")
-        dataset = FeatureLoader(
+        dataset = DataLoader(
             EMBEDDING_MODELS, FEATURE_TYPES, USE_ALL_VISITS, AGE_MATCHING, CDR_FILTER
-        ).load(features=None)
+        )
         log.info(f"dataset keys={list(dataset.keys())}")
 
         log.info("\n步驟4: 訓練模型")
