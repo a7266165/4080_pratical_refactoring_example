@@ -5,7 +5,7 @@ from typing import Dict
 from pathlib import Path
 from datetime import datetime
 import logging
-from src.utils.utils import save_json
+from src.utils import save_json
 
 logger = logging.getLogger(__name__)
 

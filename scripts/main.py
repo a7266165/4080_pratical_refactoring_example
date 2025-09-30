@@ -7,9 +7,9 @@ from datetime import datetime
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.dataloader.loader import DataLoader 
-from src.modeltrainer.modeltrainer import ModelTrainer
-from src.reporter.reporter import Reporter
+from src.dataloader import DataLoader
+from src.modeltrainer import ModelTrainer
+from src.reporter import Reporter
 
 # ==================== 配置設定 ====================
 # 特徵配置
