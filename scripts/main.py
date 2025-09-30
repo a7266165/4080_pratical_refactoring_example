@@ -9,10 +9,10 @@ from typing import List, Optional
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.preprocessor import ImagePreprocessor, batch_preprocess
-from src.extractor import FeatureExtractor, batch_extract_features
-from src.dataloader import DataLoader
-from src.modeltrainer import ModelTrainer
+from src.preprocessor import ImagePreprocessor
+from src.extractor import FeatureExtractor
+from src.loader import DataLoader
+from src.trainer import ModelTrainer
 from src.reporter import Reporter
 
 # ==================== 配置 ====================
