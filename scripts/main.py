@@ -7,7 +7,7 @@ from datetime import datetime
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.dataloader.dataloader import DataLoader
+from src.dataloader.loader import DataLoader 
 from src.modeltrainer.modeltrainer import ModelTrainer
 from src.reporter.reporter import Reporter
 
