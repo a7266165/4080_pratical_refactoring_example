@@ -4,8 +4,8 @@
 __version__ = "3.0.0"
 
 # 匯出主要類別
-from src.dataloader import DataLoader, DataSelector
-from src.modeltrainer import ModelTrainer, ClassifierType
+from src.loader import DataLoader, DataSelector
+from src.trainer import ModelTrainer, ClassifierType
 from src.reporter import Reporter
 from src.utils import (
     parse_subject_id,
