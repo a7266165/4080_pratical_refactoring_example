@@ -7,7 +7,7 @@ __version__ = "2.2.0"
 from src.dataloader.loader import DataLoader
 from src.dataloader.dataselector import DataSelector
 from src.modeltrainer.modeltrainer import ModelTrainer
-from src.modeltrainer.trainfactory.training_utils import ClassifierType
+from src.modeltrainer.trainingutils import ClassifierType
 from src.reporter.reporter import Reporter
 
 __all__ = [
