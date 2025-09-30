@@ -15,24 +15,13 @@ face_asymmetry_analysis/
 │   │   ├── __init__.py
 │   │   └── featureextractor.py # 特徵萃取管線
 │   ├── dataloader/
-│   │   ├── selector/
-│   │   │   ├── demographics.py # 
-│   │   │   ├── age_balancing.py # 平衡兩族群年齡分佈
-│   │   │   └── subject_filter.py # 
-│   │   ├── __init__.py
-│   │   ├── dataloader.py
-│   │   └── featureloader.py # 特徵載入管線
+│   │   ├── dataselector.py # 
+│   │   └── loader.py # 特徵載入管線
 │   ├── modeltrainer/
-│   │   ├── trainfactory/
-│   │   │   ├── feature_selection.py
-│   │   │   ├── classifier_factory.py
-│   │   │   ├── cross_validation.py  # 交叉驗證策略
-│   │   │   └── classifiers.py       # 分類器工廠
-│   │   ├── __init__.py
+│   │   ├── training_utils.py    
 │   │   └── modeltrainer.py          # 訓練管線
 │   ├── reporter/
-│   │   ├── __init__.py
-│   │   ├── reporter.py            # 結果匯整器
+│   │   └── reporter.py            # 結果匯整器
 │   └── utils/
 │       └── utils.py
 ├── scripts/
