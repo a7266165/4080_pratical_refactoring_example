@@ -8,7 +8,7 @@ from datetime import datetime
 import numpy as np
 from sklearn.model_selection import train_test_split, cross_val_score
 
-from src.modeltrainer.trainfactory.training_utils import (
+from src.modeltrainer.trainingutils import (
     create_classifier,
     prepare_data
 )
