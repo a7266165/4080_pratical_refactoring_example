@@ -42,3 +42,12 @@ claude
 https://claude.ai/share/c28f3d05-9623-4913-a984-950af8a80091
 GPT
 https://chatgpt.com/share/68d8b07d-87fc-8002-97a0-2b62572727e9
+
+20250929
+claude
+(1) https://claude.ai/share/6b588f9f-22ef-4067-9b24-34fa31b22119
+(2) https://claude.ai/share/65c80aa7-547a-4ccf-a9b0-fd82d6e3aa93
+(3) https://claude.ai/share/1ef9c9c9-6bfb-4ffd-9178-75d4b459daee
+
+GPT
+https://chatgpt.com/share/68db2f89-70b8-8002-8a26-057493184dcb
