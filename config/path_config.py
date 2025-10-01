@@ -3,62 +3,28 @@
 from pathlib import Path
 
 # 基礎路徑
-BASE_DIR = Path(r"C:\Users\4080\Desktop\python\Alz\Face\_analysis\asymmetry")
+PROJECT_ROOT = Path(__file__).parent.parent
+DATA_DIR = PROJECT_ROOT / "data"
+OUTPUT_DIR = PROJECT_ROOT / "output"
 
-# 資料路徑
+# 資料路徑配置
 DATA_PATHS = {
-    # 原始圖片路徑
-    "raw_images": BASE_DIR / "data" / "_pics" / "0_raw",
-    
-    # 處理過的圖片路徑
-    "processed_images": {
-        "selected": BASE_DIR / "data" / "_pics" / "1_selected",
-        "aligned": BASE_DIR / "data" / "_pics" / "2_aligned",
-        "mirrored": BASE_DIR / "data" / "_pics" / "3_mirrored",
-        "histogram_matched": BASE_DIR / "data" / "_pics" / "3_histogram_matched"
+    # 人口學資料
+    "demographics": {
+        "p_csv": DATA_DIR / "demographics" / "p_merged.csv",
+        "acs_csv": DATA_DIR / "demographics" / "ACS_merged_results.csv", 
+        "nad_csv": DATA_DIR / "demographics" / "NAD_merged_results.csv"
     },
     
-    # 特徵向量路徑
-    "features": BASE_DIR / "data" / "features" / "datung" / "DeepLearning" / "5_vector_to_feature_V2" / "datung",
-    
-    # 人口學資料路徑
-    "demographics": {
-        "p_csv": r"D:\project\Alz\face\data\datung\拍攝日期對應問卷\p_merged.csv",
-        "acs_csv": r"D:\project\Alz\face\data\datung\拍攝日期對應問卷\ACS_merged_results.csv",
-        "nad_csv": r"D:\project\Alz\face\data\datung\拍攝日期對應問卷\NAD_merged_results.csv"
+    # 圖片資料
+    "images": {
+        "raw": Path(r"D:\project\Alz\face\data\datung\raw"),  # 外部路徑
+        "preprocessed": DATA_DIR / "images" / "preprocessed"   # 專案內
+    },
+    # 特徵資料
+    "features": {
+        "datung": DATA_DIR / "features" / "datung",
+        "datung_legacy": Path(r"C:\Users\4080\Desktop\python\Alz\Face\_analysis\asymmetry\data\features\datung\DeepLearning\5_vector_to_feature_V2\datung")
     }
 }
 
-# 輸出路徑
-OUTPUT_PATHS = {
-    "results": BASE_DIR / "results" / "new_pipeline",
-    "logs": BASE_DIR / "logs"
-}
-
-# 模型相關路徑
-MODEL_PATHS = {
-    "topofr": {
-        "path": r"C:\Users\4080\Desktop\python\Alz\Face\_analysis\asymmetry\code\DeepLearning\TopoFR",
-        "model": "Glint360K_R100_TopoFR_9760.pt"
-    }
-}
-
-def get_data_path(key: str) -> Path:
-    """獲取資料路徑"""
-    if key in DATA_PATHS:
-        path = DATA_PATHS[key]
-        if isinstance(path, dict):
-            raise ValueError(f"'{key}' 包含多個子路徑，請指定具體路徑")
-        return Path(path)
-    raise KeyError(f"找不到路徑: {key}")
-
-def get_demo_path(key: str) -> str:
-    """獲取人口學資料路徑"""
-    if key in DATA_PATHS["demographics"]:
-        return DATA_PATHS["demographics"][key]
-    raise KeyError(f"找不到人口學資料路徑: {key}")
-
-def ensure_output_dirs():
-    """確保輸出目錄存在"""
-    for path in OUTPUT_PATHS.values():
-        Path(path).mkdir(parents=True, exist_ok=True)
