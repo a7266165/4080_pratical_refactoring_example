@@ -1,11 +1,11 @@
 # src/preprocessor.py
-"""影像前處理模組 - 整合步驟 0-3"""
+"""影像前處理模組"""
 import os
 import cv2
 import mediapipe as mp
 import numpy as np
 from pathlib import Path
-from typing import Tuple, List, Optional, Dict
+from typing import Tuple, List, Dict
 import logging
 from tqdm import tqdm
 
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class ImagePreprocessor:
-    """整合的影像前處理器"""
+    """影像前處理器"""
     
     def __init__(
         self,
@@ -33,7 +33,7 @@ class ImagePreprocessor:
         self.face_mesh = None
     
     def __enter__(self):
-        """進入 context manager，初始化 MediaPipe"""
+        """初始化 MediaPipe"""
         self.face_mesh = mp.solutions.face_mesh.FaceMesh(
             static_image_mode=True,
             max_num_faces=1,
@@ -54,7 +54,7 @@ class ImagePreprocessor:
         output_dir: str,
         steps: List[str] = None
     ) -> Dict[str, List[Path]]:
-        """處理整個資料夾 - 新流程：select -> mirror -> clahe -> align"""
+        """處理整個資料夾 - 流程：select -> mirror -> clahe -> align"""
         if steps is None:
             steps = ['select', 'mirror', 'clahe', 'align']
         
@@ -113,7 +113,7 @@ class ImagePreprocessor:
                     stem = img_path.stem
                     
                     if 'mirror' in steps:
-                        # Step 1: 建立鏡射（不做角度校正）
+                        # Step 1: 建立鏡射
                         left_mirror, right_mirror = self.create_mirror_images(image)
                         
                         # Step 2: CLAHE 處理
@@ -121,7 +121,7 @@ class ImagePreprocessor:
                             left_mirror = self.apply_clahe(left_mirror)
                             right_mirror = self.apply_clahe(right_mirror)
                         
-                        # Step 3: 角度校正（最後執行）
+                        # Step 3: 角度校正
                         if 'align' in steps:
                             left_mirror = self.correct_face_angle(left_mirror)
                             right_mirror = self.correct_face_angle(right_mirror)
@@ -211,7 +211,7 @@ class ImagePreprocessor:
         return rotated
     
     def create_mirror_images(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        """建立左右臉鏡射影像（不做角度校正）"""
+        """建立左右臉鏡射影像"""
         if not self.face_mesh:
             raise RuntimeError("請使用 with 語句或先呼叫 __enter__")
         
@@ -358,7 +358,7 @@ class ImagePreprocessor:
         out_size: Tuple[int, int] = (512, 512),
         margin: float = 0.08
     ) -> np.ndarray:
-        """對齊到畫布並使用預乘 alpha（不做旋轉）"""
+        """對齊到畫布並使用預乘 alpha"""
         H, W = out_size
         h, w = img_bgr.shape[:2]
         

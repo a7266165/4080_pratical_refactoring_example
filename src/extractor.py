@@ -1,5 +1,5 @@
 # src/extractor.py
-"""特徵提取與計算模組 - 整合步驟 4-5"""
+"""特徵提取模組"""
 import os
 import sys
 import json
@@ -10,13 +10,11 @@ import warnings
 import logging
 from tqdm import tqdm
 
-# 深度學習相關
 import torch
 import torch.nn as nn
 import cv2
 from deepface import DeepFace
 
-# 設定環境變數（減少執行緒競爭）
 os.environ["OMP_PROC_BIND"] = "false"
 os.environ.setdefault("KMP_BLOCKTIME", "1")
 
@@ -56,7 +54,6 @@ class FeatureExtractor:
         if self.topofr_available:
             logger.info(f"  TopoFR: 已載入 ({self.topofr_model_name})")
     
-    # ========== TopoFR 初始化 ==========
     def _init_topofr(self):
         """初始化 TopoFR 模型"""
         try:
@@ -114,7 +111,7 @@ class FeatureExtractor:
             logger.error(f"TopoFR 載入失敗: {str(e)}")
             self.topofr_available = False
     
-    # ========== Step 4: 特徵提取 ==========
+    # ========== 提取相片特徵向量 ==========
     def extract_embeddings(self, image_path: str) -> Dict[str, Optional[np.ndarray]]:
         """提取所有模型的特徵向量
         
@@ -200,7 +197,7 @@ class FeatureExtractor:
             logger.debug(f"TopoFR 提取失敗: {str(e)[:50]}")
             return None
     
-    # ========== Step 5: 差異計算 ==========
+    # ========== 計算不對稱性特徵 ==========
     def calculate_asymmetry(
         self,
         left_embeddings: Dict[str, Optional[np.ndarray]],
@@ -436,7 +433,6 @@ class FeatureExtractor:
         
         return results
 
-    
     def _find_paired_files(
         self,
         folder: Path,
