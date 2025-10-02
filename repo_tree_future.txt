@@ -4,30 +4,17 @@ face_asymmetry_analysis/
 │   └── path_config     
 ├── src/
 │   ├── __init__.py
-│   ├── featureextractor/  # 此部份程式碼待實作
-│   │   ├── preprocessor/
-│   │   │   ├── face_selection.py    # 步驟0: 臉部篩選
-│   │   │   ├── face_alignment.py    # 步驟1: 角度校正
-│   │   │   ├── face_mirroring.py    # 步驟2: 鏡射處理
-│   │   │   ├── histogram_matching.py # 步驟3: 直方圖校正
-│   │   │   ├── vector_extractors.py # 步驟4: 特徵向量提取器
-│   │   │   └── feature_calculator.py # 步驟5: 特徵計算器
-│   │   ├── __init__.py
-│   │   └── featureextractor.py # 特徵萃取管線
-│   ├── dataloader/
-│   │   ├── dataselector.py # 
-│   │   └── loader.py # 特徵載入管線
-│   ├── modeltrainer/
-│   │   ├── training_utils.py    
-│   │   └── modeltrainer.py          # 訓練管線
-│   ├── reporter/
-│   │   └── reporter.py            # 結果匯整器
-│   └── utils/
-│       └── utils.py
+│   ├── preprocessor.py
+│   ├── extractor.py
+│   ├── loader.py
+│   ├── trainer.py
+│   ├── reporter.py
+│   └── utils.py
 ├── scripts/
 │   ├── main.py
+│   └── train.py
 ├── tests/
-├── legacy/                       # 舊版程式碼（暫存）
+├── legacy/                     
 │   ├── 0_以三條中軸篩選相片.py
 │   ├── 1_以中軸角度校正圖片.py
 │   ├── 2_new_鏡射相片.py
@@ -39,5 +26,5 @@ face_asymmetry_analysis/
 ├── README.md
 ├── poetry.lock
 ├── pyproject.toml
-├── repo_tree.txt                # 現有結構
-└── repo_tree_future.txt         # 目標結構
+├── repo_tree.txt              
+└── repo_tree_future.txt
