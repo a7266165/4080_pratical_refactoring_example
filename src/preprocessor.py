@@ -1,5 +1,6 @@
 # src/preprocessor.py
 """影像前處理模組 - 整合步驟 0-3"""
+import os
 import cv2
 import mediapipe as mp
 import numpy as np
@@ -10,269 +11,207 @@ from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
-# MediaPipe 臉部中線定義
-FACEMESH_MID_LINE = frozenset([
-    (10, 151), (151, 9), (9, 8), (8, 168),
-    (168, 6), (6, 197), (197, 195), (195, 5), (5, 4),
-    (4, 1), (1, 19), (19, 94), (94, 2)
-])
-
 
 class ImagePreprocessor:
-    """影像前處理器：篩選、校正、鏡射、直方圖均衡"""
+    """整合的影像前處理器"""
     
     def __init__(
         self,
+        n_select: int = 10,
         detection_confidence: float = 0.8,
-        tracking_confidence: float = 0.8,
         clahe_clip_limit: float = 2.0,
         clahe_tile_size: int = 8,
-        n_select: int = 10,
-        feather_px: int = 2,
-        mirror_size: Tuple[int, int] = (512, 512)
+        mirror_size: Tuple[int, int] = (512, 512),
+        feather_px: int = 2
     ):
-        """
-        Args:
-            detection_confidence: MediaPipe 偵測信心值
-            tracking_confidence: MediaPipe 追蹤信心值
-            clahe_clip_limit: CLAHE 限制參數
-            clahe_tile_size: CLAHE 分塊大小
-            n_select: 每個個案選取的照片數量
-            feather_px: 鏡射時邊緣羽化像素
-            mirror_size: 鏡射輸出影像大小
-        """
+        self.n_select = n_select
         self.detection_confidence = detection_confidence
-        self.tracking_confidence = tracking_confidence
         self.clahe_clip_limit = clahe_clip_limit
         self.clahe_tile_size = clahe_tile_size
-        self.n_select = n_select
-        self.feather_px = feather_px
         self.mirror_size = mirror_size
-        
-        # 初始化 MediaPipe
-        self.mp_face_mesh = mp.solutions.face_mesh
+        self.feather_px = feather_px
         self.face_mesh = None
-        
+    
     def __enter__(self):
-        """Context manager 進入"""
-        self.face_mesh = self.mp_face_mesh.FaceMesh(
+        """進入 context manager，初始化 MediaPipe"""
+        self.face_mesh = mp.solutions.face_mesh.FaceMesh(
             static_image_mode=True,
             max_num_faces=1,
             refine_landmarks=True,
-            min_detection_confidence=self.detection_confidence,
-            min_tracking_confidence=self.tracking_confidence
+            min_detection_confidence=self.detection_confidence
         )
         return self
-        
+    
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """Context manager 離開"""
+        """離開 context manager，清理資源"""
         if self.face_mesh:
             self.face_mesh.close()
+            self.face_mesh = None
     
-    # ========== 主要處理流程 ==========
     def process_folder(
         self,
         input_dir: str,
         output_dir: str,
         steps: List[str] = None
     ) -> Dict[str, List[Path]]:
-        """處理整個資料夾
-        
-        Args:
-            input_dir: 輸入資料夾
-            output_dir: 輸出資料夾  
-            steps: 要執行的步驟 ['select', 'align', 'mirror', 'clahe']
-                   如果為 None 則執行所有步驟
-        
-        Returns:
-            處理結果的檔案路徑字典
-        """
+        """處理整個資料夾 - 新流程：select -> mirror -> clahe -> align"""
         if steps is None:
-            steps = ['select', 'align', 'mirror', 'clahe']
+            steps = ['select', 'mirror', 'clahe', 'align']
         
         input_path = Path(input_dir)
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
         
         results = {}
+        total_processed = 0
         
-        # 對每個子資料夾處理
-        for subfolder in input_path.iterdir():
-            if not subfolder.is_dir():
+        # 掃描所有包含圖片的資料夾
+        image_folders = []
+        
+        for root, dirs, files in os.walk(input_path):
+            root_path = Path(root)
+            images = [f for f in files if f.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp'))]
+            if images:
+                rel_path = root_path.relative_to(input_path)
+                image_folders.append((root_path, rel_path))
+        
+        logger.info(f"找到 {len(image_folders)} 個包含圖片的資料夾")
+        
+        # 處理每個包含圖片的資料夾
+        for folder_path, rel_path in image_folders:
+            logger.info(f"處理資料夾: {rel_path}")
+            
+            output_subfolder = output_path / rel_path
+            output_subfolder.mkdir(parents=True, exist_ok=True)
+            
+            all_images = list(folder_path.glob("*.jpg")) + \
+                        list(folder_path.glob("*.jpeg")) + \
+                        list(folder_path.glob("*.png"))
+            
+            if not all_images:
                 continue
-                
-            logger.info(f"處理資料夾: {subfolder.name}")
-            subfolder_results = []
             
-            # Step 0: 篩選最佳照片
+            # Step 0: 篩選最佳圖片
             if 'select' in steps:
-                selected_images = self.select_best_images(subfolder)
-                logger.info(f"  選擇了 {len(selected_images)} 張照片")
+                selected_images = self.select_best_images(folder_path)
+                logger.info(f"  從 {len(all_images)} 張中選擇了 {len(selected_images)} 張照片")
             else:
-                selected_images = list(subfolder.glob("*.jpg")) + list(subfolder.glob("*.png"))
+                selected_images = all_images
+                logger.info(f"  處理全部 {len(selected_images)} 張照片")
             
-            # 為每張選中的照片執行處理
-            for img_path in tqdm(selected_images, desc=f"處理 {subfolder.name}"):
+            folder_results = []
+            
+            # 處理每張照片
+            for img_path in tqdm(selected_images, desc=f"處理 {folder_path.name}"):
                 try:
-                    result_path = self._process_single_image(
-                        img_path,
-                        output_path / subfolder.name,
-                        steps
-                    )
-                    subfolder_results.extend(result_path)
+                    # 讀取影像
+                    image = cv2.imread(str(img_path))
+                    if image is None:
+                        logger.warning(f"無法讀取: {img_path.name}")
+                        continue
+                    
+                    stem = img_path.stem
+                    
+                    if 'mirror' in steps:
+                        # Step 1: 建立鏡射（不做角度校正）
+                        left_mirror, right_mirror = self.create_mirror_images(image)
+                        
+                        # Step 2: CLAHE 處理
+                        if 'clahe' in steps:
+                            left_mirror = self.apply_clahe(left_mirror)
+                            right_mirror = self.apply_clahe(right_mirror)
+                        
+                        # Step 3: 角度校正（最後執行）
+                        if 'align' in steps:
+                            left_mirror = self.correct_face_angle(left_mirror)
+                            right_mirror = self.correct_face_angle(right_mirror)
+                        
+                        # 儲存結果
+                        left_path = output_subfolder / f"{stem}_Lmirror_claheL.png"
+                        right_path = output_subfolder / f"{stem}_Rmirror_claheL.png"
+                        
+                        cv2.imwrite(str(left_path), left_mirror)
+                        cv2.imwrite(str(right_path), right_mirror)
+                        
+                        folder_results.extend([left_path, right_path])
+                        total_processed += 2
+                        
+                    else:
+                        # 沒有鏡射的處理流程
+                        if 'clahe' in steps:
+                            image = self.apply_clahe(image)
+                        if 'align' in steps:
+                            image = self.correct_face_angle(image)
+                        
+                        output_file = output_subfolder / f"{stem}_processed.png"
+                        cv2.imwrite(str(output_file), image)
+                        folder_results.append(output_file)
+                        total_processed += 1
+                        
                 except Exception as e:
                     logger.warning(f"處理 {img_path.name} 失敗: {e}")
                     continue
             
-            results[subfolder.name] = subfolder_results
-            
+            results[str(rel_path)] = folder_results
+            logger.info(f"  完成 {folder_path.name}: 產生 {len(folder_results)} 個檔案")
+        
+        logger.info(f"\n總共處理完成: {len(results)} 個資料夾, {total_processed} 個檔案")
+        logger.info(f"輸出位置: {output_path}")
+        
         return results
     
-    def _process_single_image(
-        self,
-        image_path: Path,
-        output_dir: Path,
-        steps: List[str]
-    ) -> List[Path]:
-        """處理單張影像"""
-        output_dir.mkdir(parents=True, exist_ok=True)
-        output_paths = []
-        
-        # 讀取影像
-        image = cv2.imread(str(image_path))
-        if image is None:
-            raise ValueError(f"無法讀取影像: {image_path}")
-        
-        # Step 1: 角度校正
-        if 'align' in steps:
-            image = self.correct_face_angle(image)
-        
-        # Step 2: 建立鏡射
-        if 'mirror' in steps:
-            left_mirror, right_mirror = self.create_mirror_images(image)
-            
-            # Step 3: CLAHE 處理
-            if 'clahe' in steps:
-                left_mirror = self.apply_clahe(left_mirror)
-                right_mirror = self.apply_clahe(right_mirror)
-            
-            # 儲存結果
-            stem = image_path.stem
-            left_path = output_dir / f"{stem}_Lmirror_claheL.png"
-            right_path = output_dir / f"{stem}_Rmirror_claheL.png"
-            
-            cv2.imwrite(str(left_path), left_mirror)
-            cv2.imwrite(str(right_path), right_mirror)
-            
-            output_paths = [left_path, right_path]
-        else:
-            # 如果不做鏡射，只做 CLAHE
-            if 'clahe' in steps:
-                image = self.apply_clahe(image)
-            
-            output_path = output_dir / f"{image_path.stem}_processed.png"
-            cv2.imwrite(str(output_path), image)
-            output_paths = [output_path]
-        
-        return output_paths
-    
-    # ========== Step 0: 照片篩選 ==========
-    def select_best_images(self, folder: Path) -> List[Path]:
-        """根據臉部中軸角度選擇最佳照片"""
+    def select_best_images(self, folder_path: Path) -> List[Path]:
+        """選擇最佳的 n 張照片（基於臉部角度）"""
         if not self.face_mesh:
             raise RuntimeError("請使用 with 語句或先呼叫 __enter__")
         
-        angles = {}
-        image_paths = list(folder.glob("*.jpg")) + list(folder.glob("*.png"))
+        all_images = list(folder_path.glob("*.jpg")) + \
+                    list(folder_path.glob("*.jpeg")) + \
+                    list(folder_path.glob("*.png"))
         
-        for img_path in image_paths:
+        if len(all_images) <= self.n_select:
+            return all_images
+        
+        angles = []
+        for img_path in all_images:
             image = cv2.imread(str(img_path))
             if image is None:
                 continue
-                
-            height, width = image.shape[:2]
+            
             image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
             results = self.face_mesh.process(image_rgb)
             
             if not results.multi_face_landmarks:
+                angles.append((img_path, float('inf')))
                 continue
             
-            # 計算中軸角度
-            angle = self._calculate_midline_angle(results, height, width)
-            angles[img_path] = angle
+            angle = self._calculate_face_angle(results, image.shape)
+            angles.append((img_path, abs(angle)))
         
-        # 選擇角度最小的 n 張
-        sorted_images = sorted(angles.items(), key=lambda x: x[1])[:self.n_select]
-        return [img for img, _ in sorted_images]
+        angles.sort(key=lambda x: x[1])
+        return [path for path, _ in angles[:self.n_select]]
     
-    def _calculate_midline_angle(self, results, height: int, width: int) -> float:
-        """計算臉部中軸角度（使用4點法）"""
-        landmarks = results.multi_face_landmarks[0].landmark
-        
-        # 使用關鍵點 10, 168, 4, 2
-        points = [10, 168, 4, 2]
-        dots = []
-        for idx in points:
-            point = landmarks[idx]
-            dots.append(np.array([point.x * width, point.y * height, 0]))
-        
-        # 計算向量夾角
-        total_angle = 0
-        for i in range(len(dots) - 2):
-            v1 = dots[i+1] - dots[i]
-            v2 = dots[i+2] - dots[i+1]
-            
-            dot_product = np.dot(v1, v2)
-            norm = np.linalg.norm(v1) * np.linalg.norm(v2)
-            if norm > 0:
-                angle = np.arccos(np.clip(dot_product / norm, -1.0, 1.0))
-                total_angle += np.degrees(angle)
-        
-        return total_angle
-    
-    # ========== Step 1: 角度校正 ==========
     def correct_face_angle(self, image: np.ndarray) -> np.ndarray:
         """校正臉部角度使其垂直"""
         if not self.face_mesh:
             raise RuntimeError("請使用 with 語句或先呼叫 __enter__")
         
-        h, w = image.shape[:2]
         image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         results = self.face_mesh.process(image_rgb)
         
         if not results.multi_face_landmarks:
             return image
         
-        # 計算中軸線角度
-        angle = self._calculate_rotation_angle(results, h, w)
+        angle = self._calculate_face_angle(results, image.shape)
         
-        # 旋轉影像
+        h, w = image.shape[:2]
         M = cv2.getRotationMatrix2D((w//2, h//2), -angle, 1.0)
         rotated = cv2.warpAffine(image, M, (w, h))
         
         return rotated
     
-    def _calculate_rotation_angle(self, results, height: int, width: int) -> float:
-        """計算需要旋轉的角度"""
-        angles = []
-        
-        for pair in FACEMESH_MID_LINE:
-            point1 = results.multi_face_landmarks[0].landmark[pair[0]]
-            point2 = results.multi_face_landmarks[0].landmark[pair[1]]
-            
-            dot1 = np.array([point1.x * width, point1.y * height])
-            dot2 = np.array([point2.x * width, point2.y * height])
-            
-            vector = dot2 - dot1
-            if vector[1] != 0:
-                angle = np.degrees(np.arctan(vector[0] / vector[1]))
-                angles.append(angle)
-        
-        return np.mean(angles) if angles else 0
-    
-    # ========== Step 2: 鏡射處理 ==========
     def create_mirror_images(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        """建立左右臉鏡射影像"""
+        """建立左右臉鏡射影像（不做角度校正）"""
         if not self.face_mesh:
             raise RuntimeError("請使用 with 語句或先呼叫 __enter__")
         
@@ -280,126 +219,37 @@ class ImagePreprocessor:
         results = self.face_mesh.process(image_rgb)
         
         if not results.multi_face_landmarks:
-            # 如果偵測不到臉，返回原圖
             return image.copy(), image.copy()
         
-        # 取得臉部關鍵點
         face_landmarks = results.multi_face_landmarks[0].landmark
         pts_xy = self._landmarks_to_xy(face_landmarks, image.shape)
         
-        # 建立臉部遮罩
         mask = self._build_face_mask(image.shape, pts_xy)
         
-        # 估計中線
         p0, n = self._estimate_midline(pts_xy)
         
-        # 計算有號距離
-        h, w = image.shape[:2]
-        X, Y = np.meshgrid(np.arange(w, dtype=np.float32), np.arange(h, dtype=np.float32))
-        d = (X - p0[0]) * n[0] + (Y - p0[1]) * n[1]
+        left_mirror = self._align_to_canvas_premul(
+            image, mask, p0, n, 
+            side='left',
+            out_size=self.mirror_size,
+            margin=0.08
+        )
         
-        # 計算反射座標
-        Xr = X - 2.0 * d * n[0]
-        Yr = Y - 2.0 * d * n[1]
-        
-        # 建立左右半臉
-        left_mirror = self._create_symmetric_face(image, mask, d, Xr, Yr, 'left')
-        right_mirror = self._create_symmetric_face(image, mask, d, Xr, Yr, 'right')
-        
-        # 調整輸出大小
-        left_mirror = cv2.resize(left_mirror, self.mirror_size)
-        right_mirror = cv2.resize(right_mirror, self.mirror_size)
+        right_mirror = self._align_to_canvas_premul(
+            image, mask, p0, n,
+            side='right', 
+            out_size=self.mirror_size,
+            margin=0.08
+        )
         
         return left_mirror, right_mirror
     
-    def _landmarks_to_xy(self, landmarks, img_shape: tuple) -> np.ndarray:
-        """將相對座標轉為像素座標"""
-        h, w = img_shape[:2]
-        pts = []
-        for lm in landmarks:
-            x = float(lm.x * w)
-            y = float(lm.y * h)
-            pts.append([x, y])
-        return np.array(pts, dtype=np.float64)
-    
-    def _build_face_mask(self, img_shape: tuple, face_points: np.ndarray) -> np.ndarray:
-        """建立臉部凸包遮罩"""
-        mask = np.zeros(img_shape[:2], dtype=np.uint8)
-        if face_points.shape[0] == 0:
-            return mask
-        hull = cv2.convexHull(face_points.astype(np.int32))
-        cv2.fillConvexPoly(mask, hull, 255)
-        return mask
-    
-    def _estimate_midline(self, face_points: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-        """估計臉部中線"""
-        # 使用特定的中線點
-        midline_idx = (10, 151, 9, 8, 168, 6, 197, 195, 5, 4, 1, 19, 94, 2)
-        idx = np.array(midline_idx, dtype=int)
-        idx = idx[(idx >= 0) & (idx < face_points.shape[0])]
-        
-        if idx.size == 0:
-            ml_pts = face_points
-        else:
-            ml_pts = face_points[idx, :]
-        
-        # PCA 找主軸
-        p0 = ml_pts.mean(axis=0)
-        X = ml_pts - p0
-        
-        _, _, Vt = np.linalg.svd(X, full_matrices=False)
-        u = Vt[0]
-        u = u / (np.linalg.norm(u) + 1e-12)
-        
-        # 法向量
-        n = np.array([-u[1], u[0]], dtype=np.float64)
-        if n[0] < 0:
-            n = -n
-            
-        return p0, n
-    
-    def _create_symmetric_face(
-        self,
-        image: np.ndarray,
-        mask: np.ndarray,
-        d: np.ndarray,
-        Xr: np.ndarray,
-        Yr: np.ndarray,
-        side: str
-    ) -> np.ndarray:
-        """建立對稱臉"""
-        if side == 'left':
-            region = (mask > 0) & (d < 0)
-        else:
-            region = (mask > 0) & (d > 0)
-        
-        # 建立半臉 alpha
-        alpha = np.zeros_like(mask, dtype=np.uint8)
-        alpha[region] = 255
-        
-        # 羽化邊緣
-        if self.feather_px > 0:
-            alpha = cv2.GaussianBlur(alpha, (self.feather_px*2+1, self.feather_px*2+1), 0)
-        
-        alpha = alpha.astype(np.float32) / 255.0
-        
-        # 反射半臉
-        reflected = cv2.remap(image, Xr, Yr, cv2.INTER_LINEAR)
-        reflected_alpha = cv2.remap(alpha, Xr, Yr, cv2.INTER_LINEAR)
-        
-        # 合成
-        result = image * alpha[:,:,None] + reflected * reflected_alpha[:,:,None]
-        final_alpha = np.clip(alpha + reflected_alpha, 0, 1)
-        
-        # 避免除零
-        result = np.where(final_alpha[:,:,None] > 0.01, result / final_alpha[:,:,None], 0)
-        result = np.clip(result, 0, 255).astype(np.uint8)
-        
-        return result
-    
-    # ========== Step 3: 直方圖均衡 ==========
     def apply_clahe(self, image: np.ndarray) -> np.ndarray:
-        """應用 CLAHE 直方圖均衡（Lab 色彩空間）"""
+        """應用 CLAHE 直方圖均衡"""
+        # 確保影像格式正確
+        if image.dtype != np.uint8:
+            image = np.clip(image, 0, 255).astype(np.uint8)
+        
         # 轉換到 Lab 色彩空間
         lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
         l, a, b = cv2.split(lab)
@@ -416,28 +266,173 @@ class ImagePreprocessor:
         result = cv2.cvtColor(lab_eq, cv2.COLOR_LAB2BGR)
         
         return result
-
-
-# ========== 輔助函數 ==========
-def batch_preprocess(
-    input_dir: str,
-    output_dir: str,
-    steps: List[str] = None,
-    **kwargs
-) -> Dict[str, List[Path]]:
-    """批次前處理的便捷函數
     
-    Args:
-        input_dir: 輸入目錄
-        output_dir: 輸出目錄
-        steps: 要執行的步驟
-        **kwargs: 傳給 ImagePreprocessor 的參數
+    def _calculate_face_angle(self, results, image_shape) -> float:
+        """計算臉部中軸角度"""
+        h, w = image_shape[:2]
         
-    Returns:
-        處理結果路徑
-    """
-    with ImagePreprocessor(**kwargs) as processor:
-        results = processor.process_folder(input_dir, output_dir, steps)
+        FACEMESH_MID_LINE = [
+            (10, 151), (151, 9), (9, 8), (8, 168),
+            (168, 6), (6, 197), (197, 195), (195, 5), (5, 4),
+            (4, 1), (1, 19), (19, 94), (94, 2)
+        ]
+        
+        angles = []
+        for pair in FACEMESH_MID_LINE:
+            point1 = results.multi_face_landmarks[0].landmark[pair[0]]
+            point2 = results.multi_face_landmarks[0].landmark[pair[1]]
+            
+            dot1 = np.array([point1.x * w, point1.y * h])
+            dot2 = np.array([point2.x * w, point2.y * h])
+            
+            vector = dot2 - dot1
+            if vector[1] != 0:
+                angle = np.arctan(vector[0] / vector[1])
+                angles.append(np.degrees(angle))
+            else:
+                angles.append(90.0 if vector[0] > 0 else -90.0)
+        
+        return sum(angles) / len(angles) if angles else 0
     
-    logger.info(f"處理完成，共處理 {len(results)} 個資料夾")
-    return results
+    def _landmarks_to_xy(self, landmarks, img_shape: tuple) -> np.ndarray:
+        """將 FaceMesh 的相對座標轉為像素座標"""
+        h, w = img_shape[:2]
+        pts = []
+        for lm in landmarks:
+            x = float(lm.x * w)
+            y = float(lm.y * h)
+            pts.append([x, y])
+        return np.array(pts, dtype=np.float64)
+    
+    def _build_face_mask(self, img_shape: tuple, face_points_xy: np.ndarray) -> np.ndarray:
+        """建立臉部遮罩"""
+        mask = np.zeros(img_shape[:2], dtype=np.uint8)
+        if face_points_xy.shape[0] == 0:
+            return mask
+        hull = cv2.convexHull(face_points_xy.astype(np.int32))
+        cv2.fillConvexPoly(mask, hull, 255)
+        return mask
+    
+    def _estimate_midline(
+        self,
+        face_points_xy: np.ndarray,
+        midline_idx: tuple = (10, 151, 9, 8, 168, 6, 197, 195, 5, 4, 1, 19, 94, 2)
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """估計臉部中線"""
+        idx = np.array(midline_idx, dtype=int)
+        idx = idx[(idx >= 0) & (idx < face_points_xy.shape[0])]
+        
+        if idx.size == 0:
+            ml_pts = face_points_xy
+        else:
+            idx = np.unique(idx)
+            ml_pts = face_points_xy[idx, :]
+        
+        p0 = ml_pts.mean(axis=0)
+        X = ml_pts - p0
+        
+        if not np.isfinite(X).all() or np.allclose(X, 0):
+            xs = face_points_xy[:, 0]
+            mid_x = 0.5 * (xs.min() + xs.max())
+            p0 = np.array([mid_x, face_points_xy[:, 1].mean()], dtype=np.float64)
+            n = np.array([1.0, 0.0], dtype=np.float64)
+            return p0, n
+        
+        _, _, Vt = np.linalg.svd(X, full_matrices=False)
+        u = Vt[0]
+        u = u / (np.linalg.norm(u) + 1e-12)
+        n = np.array([-u[1], u[0]], dtype=np.float64)
+        
+        if n[0] < 0:
+            n = -n
+        
+        return p0, n
+    
+    def _align_to_canvas_premul(
+        self,
+        img_bgr: np.ndarray,
+        mask_u8: np.ndarray,
+        p0: np.ndarray,
+        n: np.ndarray,
+        side: str,
+        out_size: Tuple[int, int] = (512, 512),
+        margin: float = 0.08
+    ) -> np.ndarray:
+        """對齊到畫布並使用預乘 alpha（不做旋轉）"""
+        H, W = out_size
+        h, w = img_bgr.shape[:2]
+        
+        # 計算有號距離
+        X, Y = np.meshgrid(np.arange(w, dtype=np.float32), np.arange(h, dtype=np.float32))
+        d = (X - p0[0]) * n[0] + (Y - p0[1]) * n[1]
+        
+        # 反射座標
+        Xr = X - 2.0 * d * n[0]
+        Yr = Y - 2.0 * d * n[1]
+        
+        # 建立半臉 alpha
+        if side == 'left':
+            region = (mask_u8 > 0) & (d < 0)
+        else:
+            region = (mask_u8 > 0) & (d > 0)
+        
+        alpha = np.zeros_like(mask_u8, dtype=np.uint8)
+        alpha[region] = 255
+        
+        # 羽化邊緣
+        if self.feather_px > 0:
+            alpha = cv2.GaussianBlur(alpha, (self.feather_px*2+1, self.feather_px*2+1), 0)
+        
+        alpha_f = alpha.astype(np.float32) / 255.0
+        
+        # 反射另一半
+        reflected = cv2.remap(img_bgr, Xr, Yr, cv2.INTER_LINEAR)
+        reflected_alpha = cv2.remap(alpha_f, Xr, Yr, cv2.INTER_LINEAR)
+        
+        # 合成
+        img_f = img_bgr.astype(np.float32) / 255.0
+        result_f = img_f * alpha_f[..., None] + \
+                  (reflected.astype(np.float32) / 255.0) * reflected_alpha[..., None]
+        final_alpha = np.clip(alpha_f + reflected_alpha, 0, 1)
+        
+        # 除以 alpha 還原
+        eps = 1e-6
+        result_f = np.where(final_alpha[..., None] > eps, 
+                           result_f / final_alpha[..., None], 0)
+        result = np.clip(result_f * 255, 0, 255).astype(np.uint8)
+        
+        # 不做旋轉，直接使用合成結果
+        alpha_mask = (final_alpha * 255).astype(np.uint8)
+        
+        # 找邊界並裁切
+        ys, xs = np.where(alpha_mask > 0)
+        
+        if len(xs) == 0:
+            return np.zeros((H, W, 3), dtype=np.uint8)
+        
+        x0, x1 = xs.min(), xs.max()
+        y0, y1 = ys.min(), ys.max()
+        
+        cropped = result[y0:y1+1, x0:x1+1]
+        
+        # 計算縮放比例
+        face_w = x1 - x0 + 1
+        face_h = y1 - y0 + 1
+        
+        available_w = W * (1 - 2 * margin)
+        available_h = H * (1 - 2 * margin)
+        
+        scale = min(available_w / face_w, available_h / face_h, 1.0)
+        
+        # 縮放
+        new_w = int(face_w * scale)
+        new_h = int(face_h * scale)
+        resized = cv2.resize(cropped, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
+        
+        # 置中到畫布
+        canvas = np.zeros((H, W, 3), dtype=np.uint8)
+        start_x = (W - new_w) // 2
+        start_y = (H - new_h) // 2
+        canvas[start_y:start_y+new_h, start_x:start_x+new_w] = resized
+        
+        return canvas
