@@ -1,4 +1,4 @@
-# src/dataloader.py
+# src/loader.py
 """整合的資料載入與選擇模組"""
 import json
 import re
@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
-from config.path_config import DATA_PATHS, get_demo_path
+from config.path_config import DATA_PATHS
 from src.utils import parse_subject_id, load_json
 
 logger = logging.getLogger(__name__)
@@ -444,9 +444,9 @@ class DataLoader:
         # 路徑設定
         self.data_path = Path(DATA_PATHS["features"])
         self.demo_paths = {
-            "p_csv": get_demo_path("p_csv"),
-            "acs_csv": get_demo_path("acs_csv"),
-            "nad_csv": get_demo_path("nad_csv")
+            "p_csv": DATA_PATHS["demographics"]["p_csv"],
+            "acs_csv": DATA_PATHS["demographics"]["acs_csv"],
+            "nad_csv": DATA_PATHS["demographics"]["nad_csv"]
         }
         
         # 初始化資料選擇器
