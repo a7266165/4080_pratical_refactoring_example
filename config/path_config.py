@@ -7,6 +7,11 @@ PROJECT_ROOT = Path(__file__).parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
 OUTPUT_DIR = PROJECT_ROOT / "output"
 
+
+# TopoFR 設定
+TOPOFR_PATH = PROJECT_ROOT / "TopoFR"
+TOPOFR_MODEL = "Glint360K_R100_TopoFR_9760.pt"
+
 # 資料路徑配置
 DATA_PATHS = {
     # 人口學資料

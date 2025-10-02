@@ -30,20 +30,14 @@ class FeatureExtractor:
     def __init__(
         self,
         models: List[str] = None,
-        topofr_path: Optional[str] = None,
-        topofr_model: str = "Glint360K_R100_TopoFR_9760.pt",
-        use_topofr: bool = False
+        use_topofr: bool = True  # 預設啟用
     ):
         """
         Args:
             models: 要使用的模型列表
-            topofr_path: TopoFR 模型路徑
-            topofr_model: TopoFR 模型檔名
-            use_topofr: 是否使用 TopoFR（需要額外設定）
+            use_topofr: 是否使用 TopoFR
         """
         self.models = models or ['vggface', 'arcface', 'dlib', 'deepid']
-        self.topofr_path = topofr_path
-        self.topofr_model_name = topofr_model
         self.use_topofr = use_topofr
         
         # TopoFR 相關
@@ -51,8 +45,11 @@ class FeatureExtractor:
         self.topofr_model = None
         self.topofr_device = None
         
-        # 初始化 TopoFR（如果需要）
-        if use_topofr and topofr_path:
+        # 從 path_config 取得 TopoFR 設定
+        if use_topofr:
+            from config.path_config import TOPOFR_PATH, TOPOFR_MODEL
+            self.topofr_path = str(TOPOFR_PATH)
+            self.topofr_model_name = TOPOFR_MODEL
             self._init_topofr()
         
         logger.info(f"初始化特徵提取器，模型: {self.models}")
@@ -364,7 +361,7 @@ class FeatureExtractor:
         pattern_left: str = "*_Lmirror*.png",
         pattern_right: str = "*_Rmirror*.png"
     ) -> Dict[str, List[Path]]:
-        """批次處理資料夾中的影像對
+        """批次處理資料夾中的影像對（支援巢狀結構）
         
         Args:
             input_dir: 輸入資料夾
@@ -381,25 +378,40 @@ class FeatureExtractor:
         
         results = {}
         
-        # 遍歷所有子資料夾
-        for subfolder in input_path.iterdir():
-            if not subfolder.is_dir():
-                continue
+        # 預期的資料結構：health/ACS/ACS1-1/, health/NAD/NAD1-1/, patient/P1-2/
+        # 需要建立對應的輸出結構
+        
+        # 遞迴尋找所有包含圖片的資料夾
+        image_folders = []
+        for root, dirs, files in os.walk(input_path):
+            root_path = Path(root)
+            # 檢查是否有左右臉配對
+            left_files = list(root_path.glob(pattern_left))
+            right_files = list(root_path.glob(pattern_right))
             
-            logger.info(f"處理資料夾: {subfolder.name}")
+            if left_files and right_files:
+                # 計算相對路徑
+                rel_path = root_path.relative_to(input_path)
+                image_folders.append((root_path, rel_path))
+        
+        logger.info(f"找到 {len(image_folders)} 個包含影像配對的資料夾")
+        
+        # 處理每個資料夾
+        for folder_path, rel_path in image_folders:
+            logger.info(f"處理資料夾: {rel_path}")
             
-            # 建立輸出子資料夾
-            output_subfolder = output_path / subfolder.name
+            # 建立對應的輸出資料夾結構
+            output_subfolder = output_path / rel_path
             output_subfolder.mkdir(parents=True, exist_ok=True)
             
             # 找出配對的檔案
-            pairs = self._find_paired_files(subfolder, pattern_left, pattern_right)
+            pairs = self._find_paired_files(folder_path, pattern_left, pattern_right)
             logger.info(f"  找到 {len(pairs)} 對檔案")
             
             subfolder_results = []
             
             # 處理每對檔案
-            for left_file, right_file in tqdm(pairs, desc=f"處理 {subfolder.name}"):
+            for left_file, right_file in tqdm(pairs, desc=f"處理 {rel_path}"):
                 try:
                     # 生成輸出檔名
                     base_name = left_file.name.replace("_Lmirror", "").replace("_claheL", "")
@@ -420,9 +432,10 @@ class FeatureExtractor:
                     logger.warning(f"處理失敗: {left_file.name} & {right_file.name} - {e}")
                     continue
             
-            results[subfolder.name] = subfolder_results
+            results[str(rel_path)] = subfolder_results
         
         return results
+
     
     def _find_paired_files(
         self,
@@ -527,7 +540,6 @@ def batch_extract_features(
     output_dir: str,
     models: List[str] = None,
     use_topofr: bool = False,
-    topofr_path: Optional[str] = None
 ) -> Dict[str, List[Path]]:
     """批次提取特徵的便捷函數
     
@@ -544,7 +556,6 @@ def batch_extract_features(
     extractor = FeatureExtractor(
         models=models,
         use_topofr=use_topofr,
-        topofr_path=topofr_path
     )
     
     results = extractor.process_folder(input_dir, output_dir)
