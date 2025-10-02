@@ -35,6 +35,9 @@ logs/
 .DS_Store
 Thumbs.db
 
+/TopoFR/*
+!/TopoFR/link.txt
+
 # Results
 /results/
 /output/
