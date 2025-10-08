@@ -1,10 +1,4 @@
-datapath
-
-"C:\Users\4080\Desktop\python\Alz\Face\_analysis\asymmetry\data\features\datung\DeepLearning\5_vector_to_feature_V2\datung"
-
-data tree
-
-datung
+parent_folder
 ├── health
 │   ├── ACS
 │   │   ├── ACS1-1
