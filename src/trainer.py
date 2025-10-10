@@ -531,6 +531,16 @@ class ModelTrainer:
         
         logger.info(f"訓練集: {X_train.shape}, 測試集: {X_test.shape}")
         
+        # ⭐ 新增：XGBoost特徵選擇（針對vggface的4096維）
+        selected_features = None
+        if model_type == "xgboost" and X_train.shape[1] > 1000:  # 高維度才做選擇
+            logger.info("執行XGBoost特徵選擇...")
+            X_train, X_test, selected_features = select_features_by_importance(
+                X_train, y_train, X_test,
+                importance_ratio=0.8  # 保留80%重要性
+            )
+            logger.info(f"特徵選擇後: 訓練集 {X_train.shape}, 測試集 {X_test.shape}")
+
         # 資料預處理
         X_train, X_test, scaler = prepare_data(X_train, X_test, model_type)
         
@@ -585,6 +595,7 @@ class ModelTrainer:
             "cv_mean": float(cv_scores.mean()),  # 轉換為 float
             "cv_std": float(cv_scores.std()),     # 轉換為 float
             "feature_importance": feature_importance,
+            "selected_features": selected_features,
             "X_train_shape": tuple(int(x) for x in X_train.shape),  # 轉換為 tuple of int
             "X_test_shape": tuple(int(x) for x in X_test.shape),    # 轉換為 tuple of int
             "timestamp": datetime.now().isoformat()
@@ -594,10 +605,33 @@ class ModelTrainer:
         """儲存模型和訓練結果"""
         
         # 1. 儲存模型
-        model_path = self.models_dir / f"{config_key}.pkl"
-        with open(model_path, "wb") as f:
-            pickle.dump(results["model"], f)
-        logger.info(f"模型已儲存: {model_path}")
+        model = results["model"]
+        model_type = results["model_type"]
+        
+        if model_type == "xgboost":
+            # XGBoost使用JSON格式
+            model_path = self.models_dir / f"{config_key}.json"
+            model.save_model(str(model_path))
+            logger.info(f"XGBoost模型已儲存(JSON): {model_path}")
+        else:
+            # 其他模型使用pickle格式
+            model_path = self.models_dir / f"{config_key}.pkl"
+            with open(model_path, "wb") as f:
+                pickle.dump(model, f)
+            logger.info(f"模型已儲存(PKL): {model_path}")
+    
+        
+        # ⭐ 新增：儲存特徵選擇資訊（給API用）
+        if results.get("selected_features") is not None:
+            feature_selection_info = {
+                "selected_indices": results["selected_features"],
+                "original_dim": 4096,  # VGGFace維度
+                "selected_dim": len(results["selected_features"]),
+                "importance_ratio": 0.8
+            }
+            feature_path = self.models_dir / f"{config_key}_features.json"
+            save_json(feature_selection_info, feature_path)
+            logger.info(f"特徵選擇資訊已儲存: {feature_path}")
         
         # 2. 儲存結果JSON（不含模型物件）
         results_for_save = {
@@ -623,7 +657,15 @@ class ModelTrainer:
             f.write(f"訓練時間: {results['timestamp']}\n")
             f.write(f"訓練集大小: {results['X_train_shape']}\n")
             f.write(f"測試集大小: {results['X_test_shape']}\n\n")
-            
+
+            # 特徵選擇資訊
+            if results.get("selected_features") is not None:
+                f.write(f"\n特徵選擇:\n")
+                f.write("-" * 30 + "\n")
+                f.write(f"  原始維度: 4096\n")
+                f.write(f"  選擇維度: {len(results['selected_features'])}\n")
+                f.write(f"  壓縮比例: {len(results['selected_features'])/4096:.1%}\n")
+
             # 訓練集效能
             f.write("訓練集效能:\n")
             f.write("-" * 30 + "\n")
