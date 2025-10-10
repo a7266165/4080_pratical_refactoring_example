@@ -7,10 +7,8 @@ PROJECT_ROOT = Path(__file__).parent.parent
 DATA_DIR = PROJECT_ROOT / "data"
 OUTPUT_DIR = PROJECT_ROOT / "output"
 
-
 # TopoFR 設定
 TOPOFR_PATH = PROJECT_ROOT / "TopoFR"
-TOPOFR_MODEL = "Glint360K_R100_TopoFR_9760.pt"
 
 # 資料路徑配置
 DATA_PATHS = {
@@ -23,8 +21,10 @@ DATA_PATHS = {
     
     # 圖片資料
     "images": {
-        "raw": Path(r"D:\project\Alz\face\data\datung\raw"),  # 外部路徑
-        "preprocessed": DATA_DIR / "images" / "preprocessed"   # 專案內
+        "raw": Path(r"D:\project\Alz\face\data\datung\raw"),
+        "preprocessed": DATA_DIR / "images" / "preprocessed",
+        "_raw_API": DATA_DIR / "images" / "_raw_API",
+        "_preprocessed_API": DATA_DIR / "images" / "_preprocessed_API"
     },
     # 特徵資料
     "features": {
